@@ -182,54 +182,7 @@ required_battery_capacity_charging = energy_needed / Li_ion_charge_rate * (1/cha
 required_battery_capacity_charging = float(required_battery_capacity_charging)
 print(f"Required battery capacity to provide required energy with charging time of 15 min: {required_battery_capacity_charging:.4f} kWh")
 
-# --------------------
-# Energy required to reach max_speed
-# --------------------
 
-dt_acc = 0.1        # time step [s]
-v = 0.0
-x = 0.0
-
-energy_to_vmax = 0.0    # kWh
-time_to_vmax = 0.0
-
-F_roll = Cr * mass * 9.81
-
-while v < max_speed:
-    F_ad = 0.5 * p * Cd * Af * v**2
-    F_tr = mass * acc + F_ad + F_roll
-
-    # Power at wheels
-    P_wheel = F_tr * v  # W
-
-    # Electrical power (motor losses)
-    P_elec = P_wheel / motor_eff
-
-    # Integrate energy
-    energy_to_vmax += P_elec * dt_acc / 3600 / 1000  # kWh
-    time_to_vmax += dt_acc
-
-    # Integrate speed
-    v += acc * dt_acc
-    x += v * dt_acc
-
-print(f"Time to reach max speed: {time_to_vmax:.1f} s")
-print(f"Distance to reach max speed: {x:.1f} m")
-print(f"Energy to reach max speed: {energy_to_vmax:.3f} kWh")
-
-# --------------------
-# Power required to maintain max speed
-# --------------------
-F_ad = 0.5 * p * Cd * Af * max_speed**2
-F_roll = Cr * mass * 9.81
-F_tr = F_ad + F_roll
-P_wheel = F_tr * max_speed  # W
-P_elec = P_wheel / motor_eff  # W
-print(f"Power required to maintain max speed: {P_elec/1e6:.3f} MW")
-
-charge_time = 1 / 60  # hours
-cap_capicity = energy_to_vmax - (P_elec / 1000) * (time_to_vmax / 3600)  # kWh
-print(f"Super capicitor capicity: {cap_capicity:.3f} kWh")
 
 
 # --------------------
@@ -245,7 +198,7 @@ for _, row in electrified.iterrows():
 
     electrified_driving_time += dt[mask].sum()
 
-print(electrified_driving_time)
+#print(electrified_driving_time)
 
 # --------------------
 # Plot speed profile
