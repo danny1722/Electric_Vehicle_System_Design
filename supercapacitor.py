@@ -59,7 +59,7 @@ v = 0.0
 x = 0.0
 
 energy_to_vmax = 0.0    # kWh
-cap_capicity = 0.0  # kWh
+cap_capacity = 0.0  # kWh
 time_to_vmax = 0.0
 
 F_roll = Cr * mass * 9.81
@@ -77,7 +77,7 @@ while v < max_speed:
     # Integrate energy
     energy_to_vmax += P_elec * dt_acc / 3600 / 1000  # kWh
     if P_elec > P_max_speed:
-        cap_capicity += (P_elec - P_max_speed) * dt_acc / 3600 / 1000  # kWh
+        cap_capacity += (P_elec - P_max_speed) * dt_acc / 3600 / 1000  # kWh
     
     time_to_vmax += dt_acc
 
@@ -88,7 +88,7 @@ while v < max_speed:
 print(f"Time to reach max speed: {time_to_vmax:.1f} s")
 print(f"Distance to reach max speed: {x:.1f} m")
 print(f"Energy to reach max speed: {energy_to_vmax:.3f} kWh")
-print(f"Super capicitor capicity: {cap_capicity:.3f} kWh")
+print(f"Super capicitor capacity: {cap_capacity:.3f} kWh")
 
 # --------------------
 # Create piecewise speed limit function
@@ -207,6 +207,60 @@ def simulate_speed_profile(
         v.append(v_next)
         x.append(x_next)
 
+# --------------------
+# Simulate consumed energy
+# --------------------
+def simulate_energy(
+    v,
+    mass,
+    Cd,
+    Af,
+    p,
+    Cr,
+    motor_eff,
+    regen_eff,
+    dt = 1.0
+):
+    a = np.diff(v) / np.maximum(dt, 1e-3)
+
+    power = np.zeros_like(v)
+    regen_power = np.zeros_like(v)
+
+    F_roll = Cr * mass * 9.81
+
+    total_energy = 0.0
+    total_energy_regen = 0.0
+
+    # Start from index 1 (because of diff)
+    for i in range(1, len(v)):
+        vi = v[i]
+        ai = a[i - 1]
+
+        F_ad = 0.5 * p * Cd * Af * vi**2
+        F_tr = mass * ai + F_ad + F_roll
+
+        # --------------------
+        # Power calculation
+        # --------------------
+        if F_tr >= 0:
+            Pi = F_tr * vi / motor_eff
+            Preg = Pi
+        else:
+            Pi = F_tr * vi
+            Preg = F_tr * vi * regen_eff
+
+        # Convert to MW
+        power[i] = Pi / 1e6
+        regen_power[i] = Preg / 1e6
+
+        # --------------------
+        # Energy integration
+        # --------------------
+        total_energy += max(power[i], 0) * 1000 * dt / 3600
+        total_energy_regen += regen_power[i] * 1000 * dt / 3600
+
+    return power, regen_power, total_energy, total_energy_regen
+
 def main():
     # --------------------
     # Prepare simulation
@@ -245,9 +299,6 @@ def main():
     reverse_stop_time = stop_time[::-1]
     reverse_speed_limit_val = speed_limit_val[::-1]
 
-    print(station_stops)
-    print(reverse_station_stops)
-
     rev_t, rev_x, rev_v = simulate_speed_profile(
         route_length,
         reverse_station_stops,
@@ -264,6 +315,29 @@ def main():
     x_total = np.concatenate((x, rev_x + x[-1]))
     v_total = np.concatenate((v, rev_v))
 
+    power, regen_power, total_energy, total_energy_regen = simulate_energy(
+        v_total,
+        mass,
+        Cd,
+        Af,
+        p,
+        Cr,
+        motor_eff,
+        regen_eff,
+        dt
+    )
+
+    print(f"Total energy consumed for round trip: {total_energy_regen:.3f} kWh")
+
+    cap_charge_time = np.min(stop_time)/3600 #hours
+    cap_charge_power = cap_capacity / cap_charge_time  # kW
+    print(f"Supercapacitor charge power: {cap_charge_power/1000:.3f} MW")
+
+    total_stops = (len(station_stops) - 1) * 2
+    li_ion_capacity = total_energy - cap_capacity * total_stops
+    
+    print(f"Required Li-ion battery capacity: {li_ion_capacity:.3f} kWh")
+
     plt.figure()
     plt.plot(x_total / 1000, v_total * 3.6)
     plt.xlabel("Distance [km]")
@@ -279,5 +353,14 @@ def main():
     plt.title("Speed profile along route (with station stops)")
     plt.grid()
     plt.show()
+
+    plt.figure()
+    plt.plot(x_total / 1000, regen_power)
+    plt.xlabel("distance [km]")
+    plt.ylabel("Power [MW]")
+    plt.title("Power profile along route (with station stops)")
+    plt.grid()
+    plt.show()
+
 if __name__=="__main__":
     main()
