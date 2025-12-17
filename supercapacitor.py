@@ -130,6 +130,7 @@ def simulate_speed_profile(
     state = "DRIVE"
     station_idx = 0
     dwell_timer = 0.0
+    braking = False
 
     # --------------------
     # Simulation loop
@@ -150,15 +151,17 @@ def simulate_speed_profile(
 
         braking_dist = v_curr**2 / (2 * dec)
 
-        if state == "DRIVE" and dist_to_station <= braking_dist + 1.0:
+        if (state == "DRIVE" and dist_to_station <= braking_dist + 1.0) or braking:
             # Start braking for station
             a = -dec
             if v_curr <= 0.1:
                 v_next = 0.0
                 state = "DWELL"
+                braking = False
                 dwell_timer = stop_time[station_idx]
             else:
                 v_next = max(0.0, v_curr + a * dt)
+                braking = True
 
         elif state == "DWELL":
             dwell_timer -= dt
@@ -186,17 +189,20 @@ def simulate_speed_profile(
                 if brake_dist_speed >= dist_to_drop:
                     must_brake_for_speed = True
 
+            v_min = 0.0
             # Decide acceleration
             if must_brake_for_speed:
                 a = -dec
+                v_min = v_limit_next
             elif v_curr < v_limit:
                 a = acc
             elif v_curr > v_limit:
                 a = -dec
+                v_min = v_limit
             else:
                 a = 0.0
 
-            v_next = np.clip(v_curr + a * dt, 0.0, v_limit)
+            v_next = np.clip(v_curr + a * dt, v_min, v_limit)
 
         # --------------------
         # Integrate motion
@@ -335,7 +341,7 @@ def main():
 
     total_stops = (len(station_stops) - 1) * 2
     li_ion_capacity = total_energy - cap_capacity * total_stops
-    
+
     print(f"Required Li-ion battery capacity: {li_ion_capacity:.3f} kWh")
 
     plt.figure()
