@@ -12,6 +12,7 @@ Cr = 0.0015     # Rolling resistance
 regen_eff = 0.6     # Efficiency of regenerative breaking
 motor_eff = 0.85    # Efficiency of motor and drive train
 max_speed = 120 / 3.6   # m/s
+safety_factor = 1.2
 
 #https://www.molicel.com/wp-content/uploads/Product-Data-Sheet-of-INR-18650-P30B-80111-2.pdf
 Li_ion_energy_density = 234     # Wh/kg
@@ -291,6 +292,9 @@ def main():
         dt
     )
 
+    # --------------------
+    # Reverse the order of stops to simulate return trip
+    # --------------------
     reverse_station_stops = np.zeros_like(station_stops)
     for i in range(len(station_stops)):
         reverse_station_stops[i] = route_length - station_stops[-1 - i]
@@ -340,9 +344,11 @@ def main():
     print(f"Supercapacitor charge power: {cap_charge_power/1000:.3f} MW")
 
     total_stops = (len(station_stops) - 1) * 2
-    li_ion_capacity = total_energy - cap_capacity * total_stops
+    needed_capacity = total_energy - cap_capacity * total_stops
 
-    print(f"Required Li-ion battery capacity: {li_ion_capacity:.3f} kWh")
+    print(f"Required battery capacity for a round trip: {needed_capacity:.3f} kWh")
+
+    
 
     plt.figure()
     plt.plot(x_total / 1000, v_total * 3.6)
