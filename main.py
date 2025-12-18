@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-
+from battery_simulation import optimize_storage
 acc = 0.5       # m/s²
 dec = 0.5       # m/s²
 mass = 83000    # kg
@@ -500,6 +500,30 @@ def main():
     safety_capacity = Initial_guess_battery_capacity * safety_factor
     reamaining_capcity_end_day = min_charge - round_trips * charge_difference - safety_capacity
     print(f"Remaining capacity at end of day after {round_trips} round trips: {reamaining_capcity_end_day:.3f} kWh")
+
+    best_storage, battery_charge, supercap_charge = optimize_storage(
+        v_total,
+        x_total,
+        power,
+        total_stop_time,
+        total_station_stops,
+        electrified_driving,
+        total_electrified_stations,
+        Li_ion_charge_rate,
+        Li_ion_discharge_rate,
+        cap_charge_rate,
+        Li_ion_energy_density,
+        cap_energy_density,
+        total_energy_regen,
+        round_trips,
+        safety_factor,
+        dt
+    )
+
+    print("Optimal storage configuration:")
+    print(f"  Battery capacity: {best_storage['battery_capacity']:.3f} kWh")
+    print(f"  Supercapacitor capacity: {best_storage['supercap_capacity']:.3f} kWh")
+    print(f"  Total mass: {best_storage['mass']:.3f} kg")
     
 
     #cap_charge_time = np.min(stop_time)/3600 #hours
