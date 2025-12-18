@@ -12,17 +12,18 @@ Cr = 0.0015     # Rolling resistance
 regen_eff = 0.6     # Efficiency of regenerative breaking
 motor_eff = 0.85    # Efficiency of motor and drive train
 max_speed = 120 / 3.6   # m/s
-safety_factor = 1.2
+safety_factor = 0.2     # Safety factor for how much power remains at the end of the day
+round_trips = 19    # Number of round trips to be made in a single day
 
 #https://www.molicel.com/wp-content/uploads/Product-Data-Sheet-of-INR-18650-P30B-80111-2.pdf
 Li_ion_energy_density = 234     # Wh/kg
-Li_ion_charge_rate = 0.833      # W/Wh
-Li_ion_discharge_rate = 8.33    # W/Wh
+Li_ion_charge_rate = 0.9      # W/Wh
+Li_ion_discharge_rate = 9    # W/Wh
 
 #https://maxwell.com/wp-content/uploads/2025/05/3003345.3_160V-10F_EN.3_20250409.pdf
 cap_energy_density = 5.1        # Wh/kg
 cap_specific_power = 2.6        # kW/kg
-cap_charge_rate = (2.6*1000) / 5.1  # W/Wh
+cap_charge_rate = (cap_specific_power*1000) / cap_energy_density  # W/Wh
 
 # --------------------
 # Load data
@@ -35,6 +36,7 @@ electrified = pd.read_excel("Route_Description/Apeldoorn_Zutphun.xlsx", sheet_na
 # Convert units
 # --------------------
 station_list["Total distance"] *= 1000  # km → m
+station_list["Stop time"] *= 60           # min → s
 speed_limit_df["Distance"] *= 1000           # km → m
 speed_limit_df["Total distance"] *= 1000     # km → m
 speed_limit_df["speed limit"] *= (1000/3600)  # km/h → m/s
@@ -268,6 +270,31 @@ def simulate_energy(
 
     return power, regen_power, total_energy, total_energy_regen
 
+def electrified_driving_time(x, v, electrified, route_length, dt=1.0):
+    start_pos = electrified["Start electrification"].values
+    stop_pos = electrified["Stop electrification"].values
+
+    reverse_start_pos = np.zeros_like(start_pos)
+    for i in range(len(start_pos)):
+        reverse_start_pos[i] = route_length - stop_pos[-1 - i]
+    start_pos = np.concatenate((start_pos, reverse_start_pos + route_length))
+
+    reverse_stop_pos = np.zeros_like(stop_pos)
+    for i in range(len(stop_pos)):
+        reverse_stop_pos[i] = route_length - start_pos[-1 - i]
+    stop_pos = np.concatenate((stop_pos, reverse_stop_pos + 2*route_length))
+
+    electrified_track = np.zeros_like(x, dtype=bool)
+
+    for start, stop in zip(start_pos, stop_pos):
+        electrified_track |= (
+            (x >= start) &
+            (x <  stop) &
+            (v > 0.1)
+    )
+    total_time = electrified_track.sum() * dt
+    return electrified_track,total_time
+
 def main():
     # --------------------
     # Prepare simulation
@@ -276,7 +303,7 @@ def main():
     dt = 1.0  # step size in seconds
 
     station_stops = station_list["Total distance"].values
-    stop_time = station_list["Stop time (min)"].values * 60  # convert to seconds
+    stop_time = station_list["Stop time"].values
     speed_limit_dist = speed_limit_df["Total distance"].values
     speed_limit_val = speed_limit_df["speed limit"].values
 
@@ -325,6 +352,9 @@ def main():
     x_total = np.concatenate((x, rev_x + x[-1]))
     v_total = np.concatenate((v, rev_v))
 
+    # --------------------
+    # Simulate energy consumption
+    # --------------------
     power, regen_power, total_energy, total_energy_regen = simulate_energy(
         v_total,
         mass,
@@ -339,16 +369,29 @@ def main():
 
     print(f"Total energy consumed for round trip: {total_energy_regen:.3f} kWh")
 
-    cap_charge_time = np.min(stop_time)/3600 #hours
-    cap_charge_power = cap_capacity / cap_charge_time  # kW
-    print(f"Supercapacitor charge power: {cap_charge_power/1000:.3f} MW")
+    electrified_track, electrified_time = electrified_driving_time(x_total, v_total, electrified, route_length, dt)
+    print(f"Electrified driving time: {electrified_time:.1f} s")
 
-    total_stops = (len(station_stops) - 1) * 2
-    needed_capacity = total_energy - cap_capacity * total_stops
+    station_electrified_time = 0.0
+    for _, row in station_list.iterrows():
+        if row['Electrified']:
+            station_electrified_time += row['Stop time']
+    total_electrified_time = electrified_time + station_electrified_time
 
-    print(f"Required battery capacity for a round trip: {needed_capacity:.3f} kWh")
+    print(f"Total electrified time including station stops: {total_electrified_time:.1f} s")
 
-    
+    charging_time = total_electrified_time / 3600  # hours
+    starting_battery_capacity = total_energy_regen / charging_time / Li_ion_charge_rate  # kWh
+    print(f"Initial guess for battery capacity: {starting_battery_capacity:.3f} kWh")
+
+    #cap_charge_time = np.min(stop_time)/3600 #hours
+    #cap_charge_power = cap_capacity / cap_charge_time  # kW
+    #print(f"Supercapacitor charge power: {cap_charge_power/1000:.3f} MW")
+
+    #total_stops = (len(station_stops) - 1) * 2
+    #needed_capacity = total_energy - cap_capacity * total_stops
+
+    #print(f"Required battery capacity for a round trip: {needed_capacity:.3f} kWh")
 
     plt.figure()
     plt.plot(x_total / 1000, v_total * 3.6)
