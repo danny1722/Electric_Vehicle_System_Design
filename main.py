@@ -291,16 +291,16 @@ def electrified_driving_time(x, v, electrified, route_length, dt=1.0):
         reverse_stop_pos[i] = route_length - start_pos[-1 - i]
     stop_pos = np.concatenate((stop_pos, reverse_stop_pos + 2*route_length))
 
-    electrified_track = np.zeros_like(x, dtype=bool)
+    electrified_driving = np.zeros_like(x, dtype=bool)
 
     for start, stop in zip(start_pos, stop_pos):
-        electrified_track |= (
+        electrified_driving |= (
             (x >= start) &
             (x <  stop) &
             (v > 0.1)
     )
-    total_time = electrified_track.sum() * dt
-    return electrified_track,total_time
+    total_time = electrified_driving.sum() * dt
+    return electrified_driving,total_time
 
 def simulate_battery_capacity(
     v,
@@ -308,15 +308,15 @@ def simulate_battery_capacity(
     power,
     stop_time,
     station_stops,
-    electrified_track,
+    electrified_driving,
     electrified_stations,
     capacity,
+    starting_charge,
     charge_rate,
     discharge_rate,
     dt=1.0
 ):
-    current_capacity = capacity # kWh
-    time = 0.0
+    current_capacity = starting_charge # kWh
     battery_charge = np.zeros_like(x, dtype=float)
     max_charge = capacity * charge_rate # kW
     max_discharge = capacity * discharge_rate # kW
@@ -326,16 +326,13 @@ def simulate_battery_capacity(
     for i in range(len(x)):
         Pi = power[i] * 1000  # MW → kW
 
-        # --- Energy flow ---
-        if Pi >= 0:
-            # Discharging
-            discharge_power = min(Pi, max_discharge)
-            current_capacity -= discharge_power * dt / 3600
-        else:
-            # Regeneration / charging
-            if electrified_track[i]:
-                charge_power = min(-Pi, max_charge)
-                current_capacity += charge_power * dt / 3600
+        if electrified_driving[i] and not stopped:
+            current_capacity += max_charge * dt / 3600  # kWh
+        elif Pi >= 0 and not stopped:
+            current_capacity -= Pi * dt / 3600
+        elif Pi < 0 and not stopped:
+            charge_power = min(-Pi, max_charge)
+            current_capacity += charge_power * dt / 3600
 
         # Clamp capacity
         current_capacity = np.clip(current_capacity, 0.0, capacity)
@@ -439,7 +436,7 @@ def main():
 
     print(f"Total energy consumed for round trip: {total_energy_regen:.3f} kWh")
 
-    electrified_track, electrified_time = electrified_driving_time(x_total, v_total, electrified, route_length, dt)
+    electrified_driving, electrified_time = electrified_driving_time(x_total, v_total, electrified, route_length, dt)
     print(f"Electrified driving time: {electrified_time:.1f} s")
 
     station_electrified_time = 0.0
@@ -462,19 +459,47 @@ def main():
         reverse_electrified_station[i] = electrified_stations[-1 - i]
     total_electrified_stations = np.concatenate((electrified_stations, reverse_electrified_station[1:]))
 
+    starting_charge = Initial_guess_battery_capacity
+
     battery_charge = simulate_battery_capacity(
         v_total,
         x_total,
         power,
         total_stop_time,
         total_station_stops,
-        electrified_track,
+        electrified_driving,
         total_electrified_stations,
         Initial_guess_battery_capacity,
+        starting_charge,
         Li_ion_charge_rate,
         Li_ion_discharge_rate,
         dt
     )
+
+    min_charge = np.min(battery_charge)
+
+    starting_charge = battery_charge[-1]
+    battery_charge = simulate_battery_capacity(
+        v_total,
+        x_total,
+        power,
+        total_stop_time,
+        total_station_stops,
+        electrified_driving,
+        total_electrified_stations,
+        Initial_guess_battery_capacity,
+        starting_charge,
+        Li_ion_charge_rate,
+        Li_ion_discharge_rate,
+        dt
+    )
+
+    charge_difference = starting_charge - battery_charge[-1]
+    print(f"Battery charge difference after round trip: {charge_difference:.3f} kWh")
+
+    safety_capacity = Initial_guess_battery_capacity * safety_factor
+    reamaining_capcity_end_day = min_charge - round_trips * charge_difference - safety_capacity
+    print(f"Remaining capacity at end of day after {round_trips} round trips: {reamaining_capcity_end_day:.3f} kWh")
     
 
     #cap_charge_time = np.min(stop_time)/3600 #hours
@@ -490,7 +515,7 @@ def main():
     plt.plot(x_total / 1000, v_total * 3.6)
     plt.xlabel("Distance [km]")
     plt.ylabel("Speed [km/h]")
-    plt.title("Speed profile along route (with station stops)")
+    plt.title("Speed profile along route")
     plt.grid()
     plt.show()
 
@@ -498,7 +523,7 @@ def main():
     plt.plot(t_total, v_total * 3.6)
     plt.xlabel("time [s]")
     plt.ylabel("Speed [km/h]")
-    plt.title("Speed profile along route (with station stops)")
+    plt.title("Speed profile along route")
     plt.grid()
     plt.show()
 
@@ -506,7 +531,7 @@ def main():
     plt.plot(x_total / 1000, regen_power)
     plt.xlabel("distance [km]")
     plt.ylabel("Power [MW]")
-    plt.title("Power profile along route (with station stops)")
+    plt.title("Power profile along route")
     plt.grid()
     plt.show()
 
@@ -514,7 +539,7 @@ def main():
     plt.plot(x_total / 1000, battery_charge)
     plt.xlabel("distance [km]")
     plt.ylabel("Battery charge [kWh]")
-    plt.title("Battery charge profile along route (with station stops)")
+    plt.title("Battery charge profile along route")
     plt.grid()
     plt.show()
 
