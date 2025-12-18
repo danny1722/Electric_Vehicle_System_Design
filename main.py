@@ -93,6 +93,13 @@ print(f"Distance to reach max speed: {x:.1f} m")
 print(f"Energy to reach max speed: {energy_to_vmax:.3f} kWh")
 print(f"Super capicitor capacity: {cap_capacity:.3f} kWh")
 
+def reverse_and_concatenate_array(arr, offset):
+    reversed_arr = np.zeros_like(arr)
+    for i in range(len(arr)):
+        reversed_arr[i] = offset - arr[-1 - i]
+    concatenated_arr = np.concatenate((arr, reversed_arr + offset))
+    return concatenated_arr
+
 # --------------------
 # Create piecewise speed limit function
 # --------------------
@@ -295,6 +302,68 @@ def electrified_driving_time(x, v, electrified, route_length, dt=1.0):
     total_time = electrified_track.sum() * dt
     return electrified_track,total_time
 
+def simulate_battery_capacity(
+    v,
+    x,
+    power,
+    stop_time,
+    station_stops,
+    electrified_track,
+    electrified_stations,
+    capacity,
+    charge_rate,
+    discharge_rate,
+    dt=1.0
+):
+    current_capacity = capacity # kWh
+    time = 0.0
+    battery_charge = np.zeros_like(x, dtype=float)
+    max_charge = capacity * charge_rate # kW
+    max_discharge = capacity * discharge_rate # kW
+    station_idx = 0
+    stopped = False
+
+    for i in range(len(x)):
+        Pi = power[i] * 1000  # MW → kW
+
+        # --- Energy flow ---
+        if Pi >= 0:
+            # Discharging
+            discharge_power = min(Pi, max_discharge)
+            current_capacity -= discharge_power * dt / 3600
+        else:
+            # Regeneration / charging
+            if electrified_track[i]:
+                charge_power = min(-Pi, max_charge)
+                current_capacity += charge_power * dt / 3600
+
+        # Clamp capacity
+        current_capacity = np.clip(current_capacity, 0.0, capacity)
+        battery_charge[i] = current_capacity
+
+        # --- Station handling ---
+        if station_idx < len(station_stops):
+            dist_to_station = station_stops[station_idx] - x[i]
+
+            if abs(dist_to_station) <= 20.0 and v[i] < 0.1:
+                stopped = True
+
+                if electrified_stations[station_idx]:
+                    required_energy = capacity - current_capacity  # kWh
+                    max_station_power = required_energy / stop_time[station_idx] * 3600
+                    charge_power = min(max_charge, max_station_power)
+                    #print(f"Station {station_idx+1}: Charging with {charge_power:.1f} kW for {stop_time[station_idx]:.1f} s")
+
+                    current_capacity += charge_power * dt / 3600
+                    current_capacity = min(current_capacity, capacity)
+
+            # Detect departure
+            if stopped and v[i] > 0.1:
+                stopped = False
+                station_idx += 1
+
+    return battery_charge
+
 def main():
     # --------------------
     # Prepare simulation
@@ -303,6 +372,7 @@ def main():
     dt = 1.0  # step size in seconds
 
     station_stops = station_list["Total distance"].values
+    electrified_stations = station_list["Electrified"].values
     stop_time = station_list["Stop time"].values
     speed_limit_dist = speed_limit_df["Total distance"].values
     speed_limit_val = speed_limit_df["speed limit"].values
@@ -373,16 +443,39 @@ def main():
     print(f"Electrified driving time: {electrified_time:.1f} s")
 
     station_electrified_time = 0.0
-    for _, row in station_list.iterrows():
-        if row['Electrified']:
-            station_electrified_time += row['Stop time']
+    for i in range(len(electrified_stations)):
+        if electrified_stations[i]:
+            station_electrified_time += stop_time[i]
     total_electrified_time = electrified_time + station_electrified_time
 
     print(f"Total electrified time including station stops: {total_electrified_time:.1f} s")
 
     charging_time = total_electrified_time / 3600  # hours
-    starting_battery_capacity = total_energy_regen / charging_time / Li_ion_charge_rate  # kWh
-    print(f"Initial guess for battery capacity: {starting_battery_capacity:.3f} kWh")
+    Initial_guess_battery_capacity = total_energy_regen / charging_time / Li_ion_charge_rate  # kWh
+    print(f"Initial guess for battery capacity: {Initial_guess_battery_capacity:.3f} kWh")
+
+    total_station_stops = np.concatenate((station_stops, reverse_station_stops[1:] + route_length))
+    total_stop_time = np.concatenate((stop_time, reverse_stop_time[1:]))
+
+    reverse_electrified_station = np.zeros_like(electrified_stations)
+    for i in range(len(electrified_stations)):
+        reverse_electrified_station[i] = electrified_stations[-1 - i]
+    total_electrified_stations = np.concatenate((electrified_stations, reverse_electrified_station[1:]))
+
+    battery_charge = simulate_battery_capacity(
+        v_total,
+        x_total,
+        power,
+        total_stop_time,
+        total_station_stops,
+        electrified_track,
+        total_electrified_stations,
+        Initial_guess_battery_capacity,
+        Li_ion_charge_rate,
+        Li_ion_discharge_rate,
+        dt
+    )
+    
 
     #cap_charge_time = np.min(stop_time)/3600 #hours
     #cap_charge_power = cap_capacity / cap_charge_time  # kW
@@ -414,6 +507,14 @@ def main():
     plt.xlabel("distance [km]")
     plt.ylabel("Power [MW]")
     plt.title("Power profile along route (with station stops)")
+    plt.grid()
+    plt.show()
+
+    plt.figure()
+    plt.plot(x_total / 1000, battery_charge)
+    plt.xlabel("distance [km]")
+    plt.ylabel("Battery charge [kWh]")
+    plt.title("Battery charge profile along route (with station stops)")
     plt.grid()
     plt.show()
 
