@@ -2,14 +2,14 @@ import numpy as np
 
 class TrainSimulation:
     def __init__(
-    self, 
-    route_length,
-    station_stops,
-    speed_limit_dist,
-    speed_limit_val,
-    stop_time,
-    acc,
-    dec,
+    self,
+    route_data,
+    initial_acc,
+    acc_drop_off_speed,
+    final_acc,
+    initial_dec,
+    dec_drop_off_speed,
+    final_dec,
     max_speed,
     mass,
     Cd,
@@ -18,19 +18,23 @@ class TrainSimulation:
     Cr,
     motor_eff,
     regen_eff,
-    electrified_start,
-    electrified_stop,
-    electrified_stations,
     charge_rate,
     discharge_rate,
     dt=1.0):
-        self.route_length = route_length
-        self.station_stops = station_stops
-        self.speed_limit_dist = speed_limit_dist
-        self.speed_limit_val = speed_limit_val
-        self.stop_time = stop_time
-        self.acc = acc
-        self.dec = dec
+        self.route_length = route_data['route_length']
+        self.station_stops = route_data['station_stops']
+        self.speed_limit_dist = route_data['speed_limit_dist']
+        self.speed_limit_val = route_data['speed_limit_val']
+        self.stop_time = route_data['stop_time']
+        self.electrified_start = route_data['electrified_start']
+        self.electrified_stop = route_data['electrified_stop']
+        self.electrified_stations = route_data['electrified_stations']
+        self.initial_acc = initial_acc
+        self.acc_drop_off_speed = acc_drop_off_speed
+        self.final_acc = final_acc
+        self.initial_dec = initial_dec
+        self.dec_drop_off_speed = dec_drop_off_speed
+        self.final_dec = final_dec
         self.max_speed = max_speed
         self.mass = mass
         self.Cd = Cd
@@ -39,9 +43,6 @@ class TrainSimulation:
         self.Cr = Cr
         self.motor_eff = motor_eff
         self.regen_eff = regen_eff
-        self.electrified_start = electrified_start
-        self.electrified_stop = electrified_stop
-        self.electrified_stations = electrified_stations
         self.charge_rate = charge_rate
         self.discharge_rate = discharge_rate
         self.dt = dt
@@ -50,6 +51,51 @@ class TrainSimulation:
         self.t = None
         self.x = None
         self.v = None
+
+    def deceleration_profile(self, speed):
+        if speed < self.dec_drop_off_speed:
+            return self.initial_dec
+        else:
+            dec = self.initial_dec - (self.initial_dec - self.final_dec) * (speed - self.dec_drop_off_speed) / (self.max_speed - self.dec_drop_off_speed)
+            return dec
+
+    def acceleration_profile(self, speed):
+        if speed < self.acc_drop_off_speed:
+            return self.initial_acc
+        else:
+            acc = self.initial_acc - (self.initial_acc - self.final_acc) * (speed - self.acc_drop_off_speed) / (self.max_speed - self.acc_drop_off_speed)
+            return acc
+        
+    def build_stopping_distance_table(self, num_points=5000):
+        # Speeds to evaluate
+        self.speed_table = np.linspace(0, self.max_speed, num_points)
+
+        # Storage
+        self.stop_dist_table = np.zeros_like(self.speed_table)
+
+        deceleration_profiles = np.vectorize(self.deceleration_profile)
+        dec_table = deceleration_profiles(self.speed_table)
+
+        previous_speed = 0.0
+        distance = 0.0
+        for i in range(len(self.speed_table)):
+            v = self.speed_table[i]
+            dec = dec_table[i]
+            
+            current_speed = v
+
+            speed_dif = current_speed - previous_speed
+            time = speed_dif / dec if dec != 0 else 0
+            distance += current_speed * time - 0.5 * dec * time**2
+
+            self.stop_dist_table[i] = distance
+            previous_speed = current_speed
+
+    def stopping_distance(self, speed, speed_next = 0.0):
+        if speed_next == 0.0:
+            return np.interp(speed, self.speed_table, self.stop_dist_table)
+        else:
+            return np.interp(speed, self.speed_table, self.stop_dist_table) - np.interp(speed_next, self.speed_table, self.stop_dist_table)
 
     def speed_limit_at(self, x):
         for i in range(len(self.speed_limit_dist)):
@@ -80,6 +126,8 @@ class TrainSimulation:
         dwell_timer = 0.0
         braking = False
 
+        self.build_stopping_distance_table()
+
         # --------------------
         # Simulation loop
         # --------------------
@@ -97,11 +145,11 @@ class TrainSimulation:
             else:
                 dist_to_station = np.inf
 
-            braking_dist = v_curr**2 / (2 * self.dec)
+            braking_dist = self.stopping_distance(v_curr)
 
             if (state == "DRIVE" and dist_to_station <= braking_dist + 1.0) or braking:
                 # Start braking for station
-                a = -self.dec
+                a = -self.deceleration_profile(v_curr)
                 if v_curr <= 0.1:
                     v_next = 0.0
                     state = "DWELL"
@@ -132,7 +180,7 @@ class TrainSimulation:
                 must_brake_for_speed = False
                 if x_drop is not None and v_limit_next < v_limit:
                     dist_to_drop = x_drop - x_curr
-                    brake_dist_speed = (v_curr**2 - v_limit_next**2) / (2 * self.dec)
+                    brake_dist_speed = self.stopping_distance(v_curr, v_limit_next)
 
                     if brake_dist_speed >= dist_to_drop:
                         must_brake_for_speed = True
@@ -140,16 +188,16 @@ class TrainSimulation:
                 v_min = 0.0
                 # Decide acceleration
                 if must_brake_for_speed:
-                    a = -self.dec
+                    a = -self.deceleration_profile(v_curr)
                     v_min = v_limit_next
                 elif v_curr < v_limit:
-                    a = self.acc
+                    a = self.acceleration_profile(v_curr)
                 elif v_curr > v_limit:
-                    a = -self.dec
+                    a = -self.deceleration_profile(v_curr)
                     v_min = v_limit
                 else:
                     a = 0.0
-
+                #print(f"x: {x_curr:.1f} m, v: {v_curr*3.6:.1f} km/h, v_limit: {v_limit*3.6:.1f} km/h, a: {a:.2f} m/s²")
                 v_next = np.clip(v_curr + a * self.dt, v_min, v_limit)
 
             # --------------------

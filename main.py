@@ -18,15 +18,19 @@ def main():
     safety_factor = 0.2     # Safety factor for how much power remains at the end of the day
     round_trips = 19    # Number of round trips to be made in a single day
 
+    # Acceleration and deceleration profile parameters
+    initial_dec = 0.7  # m/s²
+    dec_drop_off_speed = max_speed * 0.3  # m/s
+    final_dec = 0.1  # m/s²
+
+    initial_acc = 0.7  # m/s²
+    acc_drop_off_speed = max_speed * 0.3  # m/s
+    final_acc = 0.1  # m/s²
+
     #https://www.molicel.com/wp-content/uploads/Product-Data-Sheet-of-INR-18650-P30B-80111-2.pdf
     Li_ion_energy_density = 234     # Wh/kg
     Li_ion_charge_rate = 0.9      # W/Wh
     Li_ion_discharge_rate = 9    # W/Wh
-
-    #https://maxwell.com/wp-content/uploads/2025/05/3003345.3_160V-10F_EN.3_20250409.pdf
-    cap_energy_density = 5.1        # Wh/kg
-    cap_specific_power = 2.6        # kW/kg
-    cap_charge_rate = (cap_specific_power*1000) / cap_energy_density  # W/Wh
 
     route_data = load_route_data("Apeldoorn_Zutphun")
 
@@ -40,16 +44,13 @@ def main():
     print(f"Route Length: {route_data['route_length']}")
 
     sim = TrainSimulation(
-        route_length=route_data['route_length'],
-        station_stops=route_data['station_stops'],
-        stop_time=route_data['stop_time'],
-        speed_limit_dist=route_data['speed_limit_dist'],
-        speed_limit_val=route_data['speed_limit_val'],
-        electrified_start=route_data['electrified_start'],
-        electrified_stop=route_data['electrified_stop'],
-        electrified_stations=route_data['electrified_stations'],
-        acc=acc,
-        dec=dec,    
+        route_data=route_data,
+        initial_acc=initial_acc,
+        acc_drop_off_speed=acc_drop_off_speed,
+        final_acc=final_acc,
+        initial_dec=initial_dec,
+        dec_drop_off_speed=dec_drop_off_speed,
+        final_dec=final_dec,    
         max_speed=max_speed,
         mass=mass,
         Cd=Cd,
@@ -79,6 +80,9 @@ def main():
 
     power = sim.regen_power
     battery_charge = sim.battery_charge
+
+    max_power = np.max(sim.regen_power)
+    print(f"Max Power: {max_power:.2f} MW")
 
     plt.figure()
     plt.plot(t, v * 3.6)
