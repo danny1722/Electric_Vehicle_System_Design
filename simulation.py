@@ -1,0 +1,338 @@
+import numpy as np
+
+class TrainSimulation:
+    def __init__(
+    self, 
+    route_length,
+    station_stops,
+    speed_limit_dist,
+    speed_limit_val,
+    stop_time,
+    acc,
+    dec,
+    max_speed,
+    mass,
+    Cd,
+    Af,
+    p,
+    Cr,
+    motor_eff,
+    regen_eff,
+    electrified_start,
+    electrified_stop,
+    electrified_stations,
+    charge_rate,
+    discharge_rate,
+    dt=1.0):
+        self.route_length = route_length
+        self.station_stops = station_stops
+        self.speed_limit_dist = speed_limit_dist
+        self.speed_limit_val = speed_limit_val
+        self.stop_time = stop_time
+        self.acc = acc
+        self.dec = dec
+        self.max_speed = max_speed
+        self.mass = mass
+        self.Cd = Cd
+        self.Af = Af
+        self.p = p
+        self.Cr = Cr
+        self.motor_eff = motor_eff
+        self.regen_eff = regen_eff
+        self.electrified_start = electrified_start
+        self.electrified_stop = electrified_stop
+        self.electrified_stations = electrified_stations
+        self.charge_rate = charge_rate
+        self.discharge_rate = discharge_rate
+        self.dt = dt
+        
+        self.initilized = False
+        self.t = None
+        self.x = None
+        self.v = None
+
+    def speed_limit_at(self, x):
+        for i in range(len(self.speed_limit_dist)):
+            if x <= self.speed_limit_dist[i]:
+                return self.speed_limit_val[i]
+        return self.speed_limit_val[-1]
+
+    def next_speed_limit_drop(self, x):
+        for i in range(len(self.speed_limit_dist) - 1):
+            x_change = self.speed_limit_dist[i]
+            v_now = self.speed_limit_val[i]
+            v_next = self.speed_limit_val[i + 1]
+            if x < x_change and v_next < v_now:
+                return x_change, v_next
+
+        return None, None
+
+    def simulate_speed_profile(self):
+        # --------------------
+        # Simulation arrays
+        # --------------------
+        t = [0.0]
+        x = [0.0]
+        v = [0.0]
+
+        state = "DRIVE"
+        station_idx = 0
+        dwell_timer = 0.0
+        braking = False
+
+        # --------------------
+        # Simulation loop
+        # --------------------
+        while True:
+
+            x_curr = x[-1]
+            v_curr = v[-1]
+            t_curr = t[-1]
+
+            # --------------------
+            # Handle station stop
+            # --------------------
+            if station_idx < len(self.station_stops):
+                dist_to_station = self.station_stops[station_idx] - x_curr
+            else:
+                dist_to_station = np.inf
+
+            braking_dist = v_curr**2 / (2 * self.dec)
+
+            if (state == "DRIVE" and dist_to_station <= braking_dist + 1.0) or braking:
+                # Start braking for station
+                a = -self.dec
+                if v_curr <= 0.1:
+                    v_next = 0.0
+                    state = "DWELL"
+                    braking = False
+                    dwell_timer = self.stop_time[station_idx]
+                else:
+                    v_next = max(0.0, v_curr + a * self.dt)
+                    braking = True
+
+            elif state == "DWELL":
+                dwell_timer -= self.dt
+                v_next = 0.0
+                if station_idx == len(self.station_stops) - 1:
+                    return np.array(t), np.array(x), np.array(v)
+                if dwell_timer <= 0:
+                    state = "DRIVE"
+                    station_idx += 1
+
+            else:
+                # --------------------
+                # Normal driving
+                # --------------------
+                v_limit = min(self.speed_limit_at(x_curr), self.max_speed)
+
+                # Look ahead for speed limit reduction
+                x_drop, v_limit_next = self.next_speed_limit_drop(x_curr)
+
+                must_brake_for_speed = False
+                if x_drop is not None and v_limit_next < v_limit:
+                    dist_to_drop = x_drop - x_curr
+                    brake_dist_speed = (v_curr**2 - v_limit_next**2) / (2 * self.dec)
+
+                    if brake_dist_speed >= dist_to_drop:
+                        must_brake_for_speed = True
+
+                v_min = 0.0
+                # Decide acceleration
+                if must_brake_for_speed:
+                    a = -self.dec
+                    v_min = v_limit_next
+                elif v_curr < v_limit:
+                    a = self.acc
+                elif v_curr > v_limit:
+                    a = -self.dec
+                    v_min = v_limit
+                else:
+                    a = 0.0
+
+                v_next = np.clip(v_curr + a * self.dt, v_min, v_limit)
+
+            # --------------------
+            # Integrate motion
+            # --------------------
+            x_next = x_curr + v_next * self.dt
+
+            t.append(t_curr + self.dt)
+            v.append(v_next)
+            x.append(x_next)
+
+    # --------------------
+    # Simulate consumed energy
+    # --------------------
+    def simulate_energy(self):
+        a = np.diff(self.v) / np.maximum(self.dt, 1e-3)
+
+        F_roll = self.Cr * self.mass * 9.81
+
+        # Start from index 1 (because of diff)
+        for i in range(1, len(self.v)):
+            vi = self.v[i]
+            ai = a[i - 1]
+
+            F_ad = 0.5 * self.p * self.Cd * self.Af * vi**2
+            F_tr = self.mass * ai + F_ad + F_roll
+
+            # --------------------
+            # Power calculation
+            # --------------------
+            if F_tr >= 0:
+                Pi = F_tr * vi / self.motor_eff
+                Preg = Pi
+            else:
+                Pi = F_tr * vi
+                Preg = F_tr * vi * self.regen_eff
+            # Convert to MW
+            self.power[i] = Pi / 1e6
+            self.regen_power[i] = Preg / 1e6
+
+            # -------------------
+            # Energy integration
+            # --------------------
+            self.total_energy += max(self.power[i], 0) * 1000 * self.dt / 3600
+            self.total_energy_regen += self.regen_power[i] * 1000 * self.dt / 3600
+
+    def electrified_time(self):
+        station_electrified_time = 0.0
+        for i in range(len(self.electrified_stations) - 1):
+            if self.electrified_stations[i]:
+                station_electrified_time += self.stop_time[i]
+
+        for start, stop in zip(self.electrified_start, self.electrified_stop):
+            self.electrified_driving |= (
+                (self.x >= start) &
+                (self.x <  stop) &
+                (self.v > 0.1)
+        )
+        electrified_driving_time = self.electrified_driving.sum() * self.dt
+        self.total_time_electrified = station_electrified_time + electrified_driving_time
+
+    def simulate_battery_capacity(self, capacity, starting_charge, power):
+        current_capacity = starting_charge # kWh
+        max_charge = capacity * self.charge_rate # kW
+        max_discharge = capacity * self.discharge_rate # kW
+        self.battery_charge = np.zeros_like(self.x, dtype=float)
+        station_idx = 0
+        stopped = False
+
+        for i in range(len(self.x)):
+            Pi = power[i] * 1000  # MW → kW
+
+            if self.electrified_driving[i] and not stopped:
+                current_capacity += max_charge * self.dt / 3600  # kWh
+            elif Pi >= 0 and not stopped:
+                current_capacity -= Pi * self.dt / 3600
+            elif Pi < 0 and not stopped:
+                charge_power = min(-Pi, max_charge)
+                current_capacity += charge_power * self.dt / 3600
+
+            # Clamp capacity
+            current_capacity = max(0.0, min(current_capacity, capacity))
+            self.battery_charge[i] = current_capacity
+
+            # --- Station handling ---
+            if station_idx < len(self.station_stops):
+                dist_to_station = self.station_stops[station_idx] - self.x[i]
+
+                if abs(dist_to_station) <= 20.0 and self.v[i] < 0.1:
+                    stopped = True
+
+                    if self.electrified_stations[station_idx]:
+                        required_energy = capacity - current_capacity  # kWh
+                        max_station_power = required_energy / self.stop_time[station_idx] * 3600
+                        charge_power = min(max_charge, max_station_power)
+                        #print(f"Station {station_idx+1}: Charging with {charge_power:.1f} kW for {stop_time[station_idx]:.1f} s")
+
+                        current_capacity += charge_power * self.dt / 3600
+                        current_capacity = min(current_capacity, capacity)
+
+                # Detect departure
+                if stopped and self.v[i] > 0.1:
+                    stopped = False
+                    station_idx += 1
+
+    def initialize_variables(self):
+        if not self.initilized and self.t is not None:
+            self.power = np.zeros_like(self.v)
+            self.regen_power = np.zeros_like(self.v)
+            self.total_energy = 0.0
+            self.total_energy_regen = 0.0
+            self.capacity = 0.0
+
+            self.electrified_driving = np.zeros_like(self.x, dtype=bool)
+            self.battery_charge = np.zeros_like(self.x, dtype=float)
+
+            self.initilized = True
+        elif self.t is None:
+            raise ValueError("Speed profile must be simulated before initializing variables.")
+
+    def run_simulation(self):
+        # 1. Run the kinematic simulation
+        self.t, self.x, self.v = self.simulate_speed_profile()
+
+        # 2. Allocate dependent arrays
+        self.initialize_variables()
+
+        # 3. Energy model
+        self.simulate_energy()
+
+        # 4. Electrified time tracking
+        self.electrified_time()
+
+        # 5. Battery sizing logic
+        charging_time = self.total_time_electrified / 3600  # hours
+        self.capacity = self.total_energy_regen / charging_time / self.charge_rate  # kWh
+        print(f"Charging time (h): {charging_time:.3f}")
+        print(f"Estimated required battery capacity: {self.capacity:.3f} kWh")
+
+        # 6. Battery charge simulation
+        self.simulate_battery_capacity(
+            capacity=self.capacity,
+            starting_charge=self.capacity * 0.5,
+            power=self.regen_power
+        )
+    
+    def optimize_battery_capacity(self, target_final_charge=0.2, tol=0.01, max_iter=20, step_size=0.05, round_trips=10):
+        self.run_simulation()
+
+        test_capacity = self.capacity * 1.5
+        prev_capacity = 0.0
+
+        for iteration in range(max_iter):
+            self.simulate_battery_capacity(
+                capacity=test_capacity,
+                starting_charge=test_capacity * 0.5,
+                power=self.regen_power
+            )
+
+            start_charge = self.battery_charge[0]
+            end_charge = self.battery_charge[-1]
+            #print(f"Start charge: {start_charge:.2f} kWh, End charge: {end_charge:.2f} kWh")
+            charge_diff = start_charge - end_charge
+            total_charge_needed = round_trips * charge_diff
+            #print(f"Total charge needed for {round_trips} round trips: {total_charge_needed:.2f} kWh")
+
+            max_charge = np.max(self.battery_charge)
+            min_charge = np.min(self.battery_charge)
+            charge_range = max_charge - min_charge
+            #print(f"Charge range during simulation: {charge_range:.2f} kWh")
+
+            final_charge = (test_capacity - total_charge_needed - charge_range) / test_capacity
+            print(f"Iteration {iteration+1}: Test capacity = {test_capacity:.2f} kWh, Final charge = {final_charge:.4f}")
+
+            if abs(final_charge - target_final_charge) < tol:
+                print(f"Optimal battery capacity found: {test_capacity:.2f} kWh")
+                return test_capacity
+
+            if final_charge > target_final_charge:
+                prev_capacity = test_capacity
+                test_capacity -=  test_capacity * (final_charge - target_final_charge) * step_size
+            else:
+                return prev_capacity
+
+        print(f"Max iterations reached. Estimated optimal battery capacity: {test_capacity:.2f} kWh")
+        return test_capacity
