@@ -5,8 +5,7 @@ from initialize_data import load_route_data
 from simulation import TrainSimulation
 
 def main():
-    acc = 0.5       # m/s²
-    dec = 0.5       # m/s²
+    # Train parameters
     mass = 83000    # kg
     Cd = 2.1        # Aerodynamic drag coefficient
     p = 1.225       # Air density
@@ -19,11 +18,11 @@ def main():
     round_trips = 19    # Number of round trips to be made in a single day
 
     # Acceleration and deceleration profile parameters
-    initial_dec = 0.7  # m/s²
+    initial_dec = 0.6  # m/s²
     dec_drop_off_speed = max_speed * 0.3  # m/s
     final_dec = 0.1  # m/s²
 
-    initial_acc = 0.7  # m/s²
+    initial_acc = 0.6  # m/s²
     acc_drop_off_speed = max_speed * 0.3  # m/s
     final_acc = 0.1  # m/s²
 
@@ -33,15 +32,6 @@ def main():
     Li_ion_discharge_rate = 9    # W/Wh
 
     route_data = load_route_data("Apeldoorn_Zutphun")
-
-    print(f"Station Stops: {route_data['station_stops']}")
-    print(f"Speed Limit Distances: {route_data['speed_limit_dist']}")
-    print(f"Speed Limit Values: {route_data['speed_limit_val']}")
-    print(f"Electrified Stations: {route_data['electrified_stations']}")
-    print(f"Electrified Start Positions: {route_data['electrified_start']}")
-    print(f"Electrified Stop Positions: {route_data['electrified_stop']}")
-    print(f"Stop Times: {route_data['stop_time']}")
-    print(f"Route Length: {route_data['route_length']}")
 
     sim = TrainSimulation(
         route_data=route_data,
@@ -101,7 +91,7 @@ def main():
     plt.show()
 
     plt.figure()
-    plt.plot(x / 1000, battery_charge)
+    plt.plot(t, battery_charge)
     plt.xlabel("distance [km]")
     plt.ylabel("Battery charge [kWh]")
     plt.title("Battery charge profile along route")

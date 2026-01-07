@@ -286,14 +286,15 @@ class TrainSimulation:
             if station_idx < len(self.station_stops):
                 dist_to_station = self.station_stops[station_idx] - self.x[i]
 
-                if abs(dist_to_station) <= 20.0 and self.v[i] < 0.1:
+                if abs(dist_to_station) <= 50.0 and self.v[i] < 0.1:
                     stopped = True
+                    #print(f"At x={self.x[i]:.1f} m, dist to station {station_idx+1}: {dist_to_station:.1f} m, speed: {self.v[i]:.2f} m/s, current capacity: {current_capacity:.2f} kWh")
 
                     if self.electrified_stations[station_idx]:
                         required_energy = capacity - current_capacity  # kWh
                         max_station_power = required_energy / self.stop_time[station_idx] * 3600
                         charge_power = min(max_charge, max_station_power)
-                        #print(f"Station {station_idx+1}: Charging with {charge_power:.1f} kW for {stop_time[station_idx]:.1f} s")
+                        #print(f"Station {station_idx+1}: Charging with {charge_power:.1f} kW for {self.stop_time[station_idx]:.1f} s")
 
                         current_capacity += charge_power * self.dt / 3600
                         current_capacity = min(current_capacity, capacity)
