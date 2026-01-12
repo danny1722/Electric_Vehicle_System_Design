@@ -359,7 +359,7 @@ class TrainSimulation:
             power=self.regen_power
         )
     
-    def optimize_battery_capacity(self, target_final_charge=0.2, tol=0.01, max_iter=20, step_size=0.05, round_trips=10):
+    def optimize_battery_capacity(self, target_final_charge=0.2, tol=0.01, max_iter=20, step_size=0.05, round_trips=10, debug=True):
         self.run_simulation()
 
         test_capacity = self.capacity * 1.5
@@ -385,10 +385,12 @@ class TrainSimulation:
             #print(f"Charge range during simulation: {charge_range:.2f} kWh")
 
             final_charge = (test_capacity - total_charge_needed - charge_range) / test_capacity
-            print(f"Iteration {iteration+1}: Test capacity = {test_capacity:.2f} kWh, Final charge = {final_charge:.4f}")
+            if debug:
+                print(f"Iteration {iteration+1}: Test capacity = {test_capacity:.2f} kWh, Final charge = {final_charge:.4f}")
 
             if abs(final_charge - target_final_charge) < tol:
-                print(f"Optimal battery capacity found: {test_capacity:.2f} kWh")
+                if debug:
+                    print(f"Optimal battery capacity found: {test_capacity:.2f} kWh")
                 return test_capacity
 
             if final_charge > target_final_charge:
@@ -396,6 +398,6 @@ class TrainSimulation:
                 test_capacity -=  test_capacity * (final_charge - target_final_charge) * step_size
             else:
                 return prev_capacity
-
-        print(f"Max iterations reached. Estimated optimal battery capacity: {test_capacity:.2f} kWh")
+        if debug:
+            print(f"Max iterations reached. Estimated optimal battery capacity: {test_capacity:.2f} kWh")
         return test_capacity

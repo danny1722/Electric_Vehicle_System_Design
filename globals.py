@@ -10,6 +10,7 @@ max_speed = 120 / 3.6   # m/s
 safety_factor = 0.2     # Safety factor for how much power remains at the end of the day
 round_trips = 19    # Number of round trips to be made in a single day
 dt = 0.1             # Time step for simulation
+using_pantograph = True
 
 # Acceleration and deceleration profile parameters
 initial_dec = 0.6  # m/s²
@@ -24,3 +25,6 @@ final_acc = 0.1  # m/s²
 Li_ion_energy_density = 234     # Wh/kg
 Li_ion_charge_rate = 0.9      # W/Wh
 Li_ion_discharge_rate = 9    # W/Wh
+
+#Calculated
+battery_capacity = 0
