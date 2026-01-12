@@ -1,68 +1,42 @@
 import pandas as pd
 import numpy as np
+import globals
 import matplotlib.pyplot as plt
 from initialize_data import load_route_data
 from simulation import TrainSimulation
 
 def main():
-    # Train parameters
-    mass = 83000    # kg
-    Cd = 2.1        # Aerodynamic drag coefficient
-    p = 1.225       # Air density
-    Af =  8.4       # m² Equivalent frontal area
-    Cr = 0.0015     # Rolling resistance
-    regen_eff = 0.6     # Efficiency of regenerative breaking
-    motor_eff = 0.85    # Efficiency of motor and drive train
-    max_speed = 120 / 3.6   # m/s
-    safety_factor = 0.2     # Safety factor for how much power remains at the end of the day
-    round_trips = 19    # Number of round trips to be made in a single day
-    dt = 0.1             # Time step for simulation
-
-    # Acceleration and deceleration profile parameters
-    initial_dec = 0.6  # m/s²
-    dec_drop_off_speed = max_speed * 0.3  # m/s
-    final_dec = 0.1  # m/s²
-
-    initial_acc = 0.6  # m/s²
-    acc_drop_off_speed = max_speed * 0.3  # m/s
-    final_acc = 0.1  # m/s²
-
-    #https://www.molicel.com/wp-content/uploads/Product-Data-Sheet-of-INR-18650-P30B-80111-2.pdf
-    Li_ion_energy_density = 234     # Wh/kg
-    Li_ion_charge_rate = 0.9      # W/Wh
-    Li_ion_discharge_rate = 9    # W/Wh
-
     route_data = load_route_data("Apeldoorn_Zutphun")
 
     sim = TrainSimulation(
         route_data=route_data,
-        initial_acc=initial_acc,
-        acc_drop_off_speed=acc_drop_off_speed,
-        final_acc=final_acc,
-        initial_dec=initial_dec,
-        dec_drop_off_speed=dec_drop_off_speed,
-        final_dec=final_dec,    
-        max_speed=max_speed,
-        mass=mass,
-        Cd=Cd,
-        Af=Af,
-        p=p,
-        Cr=Cr,
-        motor_eff=motor_eff,
-        regen_eff=regen_eff,
-        charge_rate=Li_ion_charge_rate,
-        discharge_rate=Li_ion_discharge_rate,
-        dt=dt
+        initial_acc=globals.initial_acc,
+        acc_drop_off_speed=globals.acc_drop_off_speed,
+        final_acc=globals.final_acc,
+        initial_dec=globals.initial_dec,
+        dec_drop_off_speed=globals.dec_drop_off_speed,
+        final_dec=globals.final_dec,    
+        max_speed=globals.max_speed,
+        mass=globals.mass,
+        Cd=globals.Cd,
+        Af=globals.Af,
+        p=globals.p,
+        Cr=globals.Cr,
+        motor_eff=globals.motor_eff,
+        regen_eff=globals.regen_eff,
+        charge_rate=globals.Li_ion_charge_rate,
+        discharge_rate=globals.Li_ion_discharge_rate,
+        dt=globals.dt
     )
 
     #sim.run_simulation()
  
     battery_capacity = sim.optimize_battery_capacity(
-        target_final_charge=safety_factor,
+        target_final_charge=globals.safety_factor,
         tol=0.01,
         max_iter=20,
         step_size=0.05,
-        round_trips=round_trips
+        round_trips=globals.round_trips
     )
 
     t = sim.t
@@ -76,46 +50,46 @@ def main():
     print(f"Max Power: {max_power:.2f} MW")
 
     print(f"Regenerative Energy over route: {sim.regenerated_power:.2f} kWh")
-    print(f"Total energy regenrated over {round_trips} round trips: {sim.regenerated_power * round_trips:.2f} kWh")
+    print(f"Total energy regenrated over {globals.round_trips} round trips: {sim.regenerated_power * globals.round_trips:.2f} kWh")
 
     print(f"Pantograph Energy drawn over route: {np.sum(sim.pantograph_power):.2f} kWh")
-    print(f"Total pantograph energy drawn over {round_trips} round trips: {np.sum(sim.pantograph_power) * round_trips:.2f} kWh")
-    print(f"Max Pantograph Power drawn over route: {np.max(sim.pantograph_power) * (1/dt) * 3600:.2f} kW")
+    print(f"Total pantograph energy drawn over {globals.round_trips} round trips: {np.sum(sim.pantograph_power) * globals.round_trips:.2f} kWh")
+    print(f"Max Pantograph Power drawn over route: {np.max(sim.pantograph_power) * (1/globals.dt) * 3600:.2f} kW")
 
     sim2 = TrainSimulation(
         route_data=route_data,
-        initial_acc=initial_acc,
-        acc_drop_off_speed=acc_drop_off_speed,
-        final_acc=final_acc,
-        initial_dec=initial_dec,
-        dec_drop_off_speed=dec_drop_off_speed,
-        final_dec=final_dec,    
-        max_speed=max_speed,
-        mass=mass,
-        Cd=Cd,
-        Af=Af,
-        p=p,
-        Cr=Cr,
-        motor_eff=motor_eff,
-        regen_eff=regen_eff,
-        charge_rate=Li_ion_charge_rate,
-        discharge_rate=Li_ion_discharge_rate,
-        dt=dt,
+        initial_acc=globals.initial_acc,
+        acc_drop_off_speed=globals.acc_drop_off_speed,
+        final_acc=globals.final_acc,
+        initial_dec=globals.initial_dec,
+        dec_drop_off_speed=globals.dec_drop_off_speed,
+        final_dec=globals.final_dec,    
+        max_speed=globals.max_speed,
+        mass=globals.mass,
+        Cd=globals.Cd,
+        Af=globals.Af,
+        p=globals.p,
+        Cr=globals.Cr,
+        motor_eff=globals.motor_eff,
+        regen_eff=globals.regen_eff,
+        charge_rate=globals.Li_ion_charge_rate,
+        discharge_rate=globals.Li_ion_discharge_rate,
+        dt=globals.dt,
         using_pantograph=False
     )
 
     battery_capacity_no_pantograph = sim2.optimize_battery_capacity(
-        target_final_charge=safety_factor,
+        target_final_charge=globals.safety_factor,
         tol=0.01,
         max_iter=20,
         step_size=0.05,
-        round_trips=round_trips
+        round_trips=globals.round_trips
     )
 
     battery_capacity_difference = battery_capacity_no_pantograph - battery_capacity
     print(f"Battery size reduction by using pantograph: {battery_capacity_difference:.2f} kWh")
 
-    weight_saving = (battery_capacity_difference / Li_ion_energy_density) * 1000  # kg
+    weight_saving = (battery_capacity_difference / globals.Li_ion_energy_density) * 1000  # kg
     print(f"Weight saving by using pantograph: {weight_saving:.2f} kg")
 
     plt.figure()
