@@ -20,7 +20,9 @@ class TrainSimulation:
     regen_eff,
     charge_rate,
     discharge_rate,
-    dt=1.0):
+    dt=1.0,
+    using_pantograph=True
+    ):
         self.route_length = route_data['route_length']
         self.station_stops = route_data['station_stops']
         self.speed_limit_dist = route_data['speed_limit_dist']
@@ -46,12 +48,32 @@ class TrainSimulation:
         self.charge_rate = charge_rate
         self.discharge_rate = discharge_rate
         self.dt = dt
+        self.using_pantograph = using_pantograph
         
         self.initilized = False
         self.t = None
         self.x = None
         self.v = None
 
+        self.regenerated_power = 0.0
+
+    def initialize_variables(self):
+        if not self.initilized and self.t is not None:
+            self.power = np.zeros_like(self.v)
+            self.regen_power = np.zeros_like(self.v)
+            self.total_energy = 0.0
+            self.total_energy_regen = 0.0
+            self.capacity = 0.0
+
+            self.electrified_driving = np.zeros_like(self.x, dtype=bool)
+            self.battery_charge = np.zeros_like(self.x, dtype=float)
+
+            self.pantograph_power = np.zeros_like(self.x, dtype=float)
+
+            self.initilized = True
+        elif self.t is None:
+            raise ValueError("Speed profile must be simulated before initializing variables.")
+    
     def deceleration_profile(self, speed):
         if speed < self.dec_drop_off_speed:
             return self.initial_dec
@@ -266,16 +288,20 @@ class TrainSimulation:
         self.battery_charge = np.zeros_like(self.x, dtype=float)
         station_idx = 0
         stopped = False
+        self.regenerated_power = 0.0
+        self.pantograph_power_total = 0.0
 
         for i in range(len(self.x)):
             Pi = power[i] * 1000  # MW → kW
 
-            if self.electrified_driving[i] and not stopped:
+            if self.electrified_driving[i] and not stopped and self.using_pantograph: # Drawing power from overhead lines
                 current_capacity += max_charge * self.dt / 3600  # kWh
-            elif Pi >= 0 and not stopped:
+                self.pantograph_power[i] = (max_charge * self.dt / 3600) + (Pi * self.dt / 3600)
+            elif Pi >= 0 and not stopped: # Power consumption
                 current_capacity -= Pi * self.dt / 3600
-            elif Pi < 0 and not stopped:
+            elif Pi < 0 and not stopped: # Regenerative braking
                 charge_power = min(-Pi, max_charge)
+                self.regenerated_power += charge_power * self.dt / 3600
                 current_capacity += charge_power * self.dt / 3600
 
             # Clamp capacity
@@ -288,7 +314,9 @@ class TrainSimulation:
 
                 if abs(dist_to_station) <= 50.0 and self.v[i] < 0.1:
                     stopped = True
-                    #print(f"At x={self.x[i]:.1f} m, dist to station {station_idx+1}: {dist_to_station:.1f} m, speed: {self.v[i]:.2f} m/s, current capacity: {current_capacity:.2f} kWh")
+                    # Debug info
+                    #if i % 100 == 0:
+                    #    print(f"At x={self.x[i]:.1f} m, dist to station {station_idx+1}: {dist_to_station:.1f} m, speed: {self.v[i]:.2f} m/s, current capacity: {current_capacity:.2f} kWh")
 
                     if self.electrified_stations[station_idx]:
                         required_energy = capacity - current_capacity  # kWh
@@ -304,20 +332,6 @@ class TrainSimulation:
                     stopped = False
                     station_idx += 1
 
-    def initialize_variables(self):
-        if not self.initilized and self.t is not None:
-            self.power = np.zeros_like(self.v)
-            self.regen_power = np.zeros_like(self.v)
-            self.total_energy = 0.0
-            self.total_energy_regen = 0.0
-            self.capacity = 0.0
-
-            self.electrified_driving = np.zeros_like(self.x, dtype=bool)
-            self.battery_charge = np.zeros_like(self.x, dtype=float)
-
-            self.initilized = True
-        elif self.t is None:
-            raise ValueError("Speed profile must be simulated before initializing variables.")
 
     def run_simulation(self):
         # 1. Run the kinematic simulation

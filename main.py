@@ -16,6 +16,7 @@ def main():
     max_speed = 120 / 3.6   # m/s
     safety_factor = 0.2     # Safety factor for how much power remains at the end of the day
     round_trips = 19    # Number of round trips to be made in a single day
+    dt = 0.1             # Time step for simulation
 
     # Acceleration and deceleration profile parameters
     initial_dec = 0.6  # m/s²
@@ -51,7 +52,7 @@ def main():
         regen_eff=regen_eff,
         charge_rate=Li_ion_charge_rate,
         discharge_rate=Li_ion_discharge_rate,
-        dt=1.0
+        dt=dt
     )
 
     #sim.run_simulation()
@@ -74,9 +75,52 @@ def main():
     max_power = np.max(sim.regen_power)
     print(f"Max Power: {max_power:.2f} MW")
 
+    print(f"Regenerative Energy over route: {sim.regenerated_power:.2f} kWh")
+    print(f"Total energy regenrated over {round_trips} round trips: {sim.regenerated_power * round_trips:.2f} kWh")
+
+    print(f"Pantograph Energy drawn over route: {np.sum(sim.pantograph_power):.2f} kWh")
+    print(f"Total pantograph energy drawn over {round_trips} round trips: {np.sum(sim.pantograph_power) * round_trips:.2f} kWh")
+    print(f"Max Pantograph Power drawn over route: {np.max(sim.pantograph_power) * (1/dt) * 3600:.2f} kW")
+
+    sim2 = TrainSimulation(
+        route_data=route_data,
+        initial_acc=initial_acc,
+        acc_drop_off_speed=acc_drop_off_speed,
+        final_acc=final_acc,
+        initial_dec=initial_dec,
+        dec_drop_off_speed=dec_drop_off_speed,
+        final_dec=final_dec,    
+        max_speed=max_speed,
+        mass=mass,
+        Cd=Cd,
+        Af=Af,
+        p=p,
+        Cr=Cr,
+        motor_eff=motor_eff,
+        regen_eff=regen_eff,
+        charge_rate=Li_ion_charge_rate,
+        discharge_rate=Li_ion_discharge_rate,
+        dt=dt,
+        using_pantograph=False
+    )
+
+    battery_capacity_no_pantograph = sim2.optimize_battery_capacity(
+        target_final_charge=safety_factor,
+        tol=0.01,
+        max_iter=20,
+        step_size=0.05,
+        round_trips=round_trips
+    )
+
+    battery_capacity_difference = battery_capacity_no_pantograph - battery_capacity
+    print(f"Battery size reduction by using pantograph: {battery_capacity_difference:.2f} kWh")
+
+    weight_saving = (battery_capacity_difference / Li_ion_energy_density) * 1000  # kg
+    print(f"Weight saving by using pantograph: {weight_saving:.2f} kg")
+
     plt.figure()
     plt.plot(t, v * 3.6)
-    plt.xlabel("Distance [km]")
+    plt.xlabel("Time [s]")
     plt.ylabel("Speed [km/h]")
     plt.title("Speed profile along route")
     plt.grid()
@@ -84,7 +128,7 @@ def main():
 
     plt.figure()
     plt.plot(t, power)
-    plt.xlabel("distance [km]")
+    plt.xlabel("Time [s]")
     plt.ylabel("Power [MW]")
     plt.title("Power profile along route")
     plt.grid()
@@ -92,7 +136,7 @@ def main():
 
     plt.figure()
     plt.plot(t, battery_charge)
-    plt.xlabel("distance [km]")
+    plt.xlabel("Time [s]")
     plt.ylabel("Battery charge [kWh]")
     plt.title("Battery charge profile along route")
     plt.grid()
