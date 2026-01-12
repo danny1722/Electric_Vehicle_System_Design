@@ -10,7 +10,9 @@
   <body>
     <form method="post">
       <div class="grid">
-        <div class="graph module"></div>
+        <div class="graph module">
+          <img src="{{ url_for('static', filename='batteryProfile.png') }}" />
+        </div>
         <div class="info module">
           <h1>Range: 25 km</h1>
           <h1>Weight: 100.000 kg</h1>

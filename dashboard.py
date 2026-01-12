@@ -1,4 +1,5 @@
 from flask import Flask, request, render_template
+from main import main
 
 app = Flask(__name__)
 
@@ -7,6 +8,7 @@ app = Flask(__name__)
 
 def submit():
     if request.method == 'POST':
+        main()
         batteryCapacity = request.form['battery-capacity']
         return render_template('main.html', batteryCapacity=batteryCapacity)
     return render_template('main.html', batteryCapacity=batteryCapacity)

@@ -98,7 +98,8 @@ def main():
     plt.ylabel("Speed [km/h]")
     plt.title("Speed profile along route")
     plt.grid()
-    plt.show()
+    # plt.show()
+    plt.savefig('static/speedProfile.png')
 
     plt.figure()
     plt.plot(t, power)
@@ -106,7 +107,8 @@ def main():
     plt.ylabel("Power [MW]")
     plt.title("Power profile along route")
     plt.grid()
-    plt.show()
+    # plt.show()
+    plt.savefig('static/powerProfile.png')
 
     plt.figure()
     plt.plot(t, battery_charge)
@@ -114,7 +116,8 @@ def main():
     plt.ylabel("Battery charge [kWh]")
     plt.title("Battery charge profile along route")
     plt.grid()
-    plt.show()
+    # plt.show()
+    plt.savefig('static/batteryProfile.png')
 
 if __name__=="__main__":
     main()
