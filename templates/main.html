@@ -11,7 +11,16 @@
     <form method="post">
       <div class="grid">
         <div class="graph module">
-          <img src="{{ url_for('static', filename='batteryProfile.png') }}" />
+          <div class="carousel">
+            <div class="img-wrap">
+              <img src="{{ url_for('static', filename='batteryProfile.png') }}" alt="1" />
+              <img src="{{ url_for('static', filename='powerProfile.png') }}" alt="2" />
+              <img src="{{ url_for('static', filename='speedProfile.png') }}" alt="3" />
+            </div>
+            <!-- TODO make these buttons not submit form -->
+            <button class="btn prev" type="button">‹</button>
+            <button class="btn next" type="button">›</button>
+          </div>
         </div>
         <div class="info module">
           <!-- <h1>Range: 25 km</h1> -->
@@ -32,16 +41,41 @@
         </div>
         <div class="c module"></div>
         <div class="d module">
-          <label>Mass (ex. battery): <input type="number" name="chassis_mass" id="chassis_mass" value="{{ chassis_mass }}" step="1" /></label>
+          <label>Mass (ex. battery): <input type="number" name="chassis_mass" id="chassis_mass" value="{{ chassis_mass }}" step="1" /> kg</label>
           <label>Aerodynamic drag coefficient: <input type="number" name="Cd" id="Cd" value="{{ Cd }}" step="0.01" /></label>
           <label>m² Equivalent frontal area: <input type="number" name="Af" id="Af" value="{{ Af }}" step="0.01" /></label>
           <label>Rolling resistance: <input type="number" name="Cr" id="Cr" value="{{ Cr }}" step="0.01" /></label>
           <label>regenerative breaking efficiency: <input type="number" name="regen_eff" id="regen_eff" value="{{ regen_eff }}" step="0.01" /></label>
           <label>Motor and drive train efficiency: <input type="number" name="motor_eff" id="motor_eff" value="{{ motor_eff }}" step="0.01" /></label>
-          <label>Number of round trips: <input type="number" name="round_trips" id="round_trips" value="{{ round_trips }}" step="0.01" /></label>
+          <label>Number of round trips: <input type="number" name="round_trips" id="round_trips" value="{{ round_trips }}" step="1" /></label>
         </div>
       </div>
     </form>
   </body>
-  <script src="main.ts"></script>
+  <script>
+    const prev = document.querySelector(".prev");
+    const next = document.querySelector(".next");
+    const wrap = document.querySelector(".img-wrap");
+    const imgs = document.querySelectorAll(".img-wrap img");
+    let idx = 0;
+    function showImg() {
+      if (idx >= imgs.length) idx = 0;
+      if (idx < 0) idx = imgs.length - 1;
+      wrap.style.transform = `translateX(-${idx * 100}%)`;
+    }
+    next.addEventListener("click", () => {
+      idx++;
+      showImg();
+    });
+
+    prev.addEventListener("click", () => {
+      idx--;
+      showImg();
+    });
+    setInterval(() => {
+      idx++;
+      showImg();
+    }, 10000);
+    showImg();
+  </script>
 </html>
