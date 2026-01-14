@@ -39,12 +39,14 @@
           <h1>Pantograph</h1>
           <label><input type="checkbox" name="using_pantograph" id="using_pantograph" {{ using_pantograph }} />Use pantograph</label>
         </div>
-        <div class="c module"></div>
-        <div class="d module">
+        <div class="c module">
+          <h1>Chassis</h1>
           <label>Mass (ex. battery): <input type="number" name="chassis_mass" id="chassis_mass" value="{{ chassis_mass }}" step="1" /> kg</label>
           <label>Aerodynamic drag coefficient: <input type="number" name="Cd" id="Cd" value="{{ Cd }}" step="0.01" /></label>
-          <label>m² Equivalent frontal area: <input type="number" name="Af" id="Af" value="{{ Af }}" step="0.01" /></label>
+          <label>Equivalent frontal area: <input type="number" name="Af" id="Af" value="{{ Af }}" step="0.01" /> m²</label>
           <label>Rolling resistance: <input type="number" name="Cr" id="Cr" value="{{ Cr }}" step="0.01" /></label>
+        </div>
+        <div class="d module">
           <label>regenerative breaking efficiency: <input type="number" name="regen_eff" id="regen_eff" value="{{ regen_eff }}" step="0.01" /></label>
           <label>Motor and drive train efficiency: <input type="number" name="motor_eff" id="motor_eff" value="{{ motor_eff }}" step="0.01" /></label>
           <label>Number of round trips: <input type="number" name="round_trips" id="round_trips" value="{{ round_trips }}" step="1" /></label>
@@ -73,6 +75,9 @@
       showImg();
     });
     setInterval(() => {
+      if (wrap.matches(":hover")) {
+        return;
+      }
       idx++;
       showImg();
     }, 10000);
