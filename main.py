@@ -28,6 +28,11 @@ def main():
     acc_drop_off_speed = max_speed * 0.3  # m/s
     final_acc = 0.1  # m/s²
 
+    # Pantograph parameters
+    pantograph_weight = 158 # kg
+    pantograph_count = 2
+    
+
     #https://www.molicel.com/wp-content/uploads/Product-Data-Sheet-of-INR-18650-P30B-80111-2.pdf
     Li_ion_energy_density = 234     # Wh/kg
     Li_ion_charge_rate = 0.9      # W/Wh

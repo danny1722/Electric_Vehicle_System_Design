@@ -66,7 +66,6 @@ class TrainSimulation:
             self.total_energy = 0.0
             self.total_energy_regen = 0.0
             self.capacity = 0.0
-            self.utilities_power = 0.0
 
             self.electrified_driving = np.zeros_like(self.x, dtype=bool)
             self.battery_charge = np.zeros_like(self.x, dtype=float)
