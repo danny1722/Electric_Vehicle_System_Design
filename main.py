@@ -98,6 +98,10 @@ def main(debug=True):
     # if debug:
     #     print(f"Weight saving by using pantograph: {weight_saving:.2f} kg")
 
+    print(f"power used {sim.total_energy_regen / (sim.t[-1] / 3600):.2f} kW")
+    print(f"Power used by utilities: {sim.utilities_power:.2f} kW")
+
+
     plt.figure()
     plt.plot(t, v * 3.6)
     plt.xlabel("Time [s]")
