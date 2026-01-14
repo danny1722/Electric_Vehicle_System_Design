@@ -26,7 +26,7 @@
           <!-- <h1>Range: 25 km</h1> -->
           <h1>Weight: {{ mass }} kg</h1>
           <h1>Battery: {{ batteryCapacityStr }} kWh</h1>
-          <h1>Max Speed: {{ max_speed }} m/s</h1>
+          <h1>Max Speed: {{ max_speed }} km/h</h1>
           <input type="submit" value="Submit" />
         </div>
         <div class="battery module">
@@ -37,6 +37,7 @@
         </div>
         <div class="b module">
           <h1>Pantograph</h1>
+          <p>The pantographs can power and charge the train when overhead lines are present</p>
           <label><input type="checkbox" name="using_pantograph" id="using_pantograph" {{ using_pantograph }} />Use pantograph</label>
         </div>
         <div class="c module">
@@ -44,10 +45,11 @@
           <label>Mass (ex. battery): <input type="number" name="chassis_mass" id="chassis_mass" value="{{ chassis_mass }}" step="1" /> kg</label>
           <label>Aerodynamic drag coefficient: <input type="number" name="Cd" id="Cd" value="{{ Cd }}" step="0.01" /></label>
           <label>Equivalent frontal area: <input type="number" name="Af" id="Af" value="{{ Af }}" step="0.01" /> m²</label>
-          <label>Rolling resistance: <input type="number" name="Cr" id="Cr" value="{{ Cr }}" step="0.01" /></label>
+          <label>Rolling resistance: <input type="number" name="Cr" id="Cr" value="{{ Cr }}" step="0.0001" /></label>
         </div>
         <div class="d module">
-          <label>regenerative breaking efficiency: <input type="number" name="regen_eff" id="regen_eff" value="{{ regen_eff }}" step="0.01" /></label>
+          <h1>Miscellaneous</h1>
+          <label>Regenerative breaking efficiency: <input type="number" name="regen_eff" id="regen_eff" value="{{ regen_eff }}" step="0.01" /></label>
           <label>Motor and drive train efficiency: <input type="number" name="motor_eff" id="motor_eff" value="{{ motor_eff }}" step="0.01" /></label>
           <label>Number of round trips: <input type="number" name="round_trips" id="round_trips" value="{{ round_trips }}" step="1" /></label>
         </div>

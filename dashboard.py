@@ -30,7 +30,7 @@ def submit():
       usePantograph = 'checked'
     return render_template('main.html', 
                            mass = globals.mass + batteryMass,
-                           max_speed=int(globals.max_speed),
+                           max_speed=int(globals.max_speed*3.6),
                            batteryCapacityStr=int(globals.battery_capacity), 
                            batteryMass = batteryMass,
                            safety_factor = globals.safety_factor,

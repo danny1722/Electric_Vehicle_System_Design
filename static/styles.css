@@ -30,6 +30,7 @@ body {
     }
     .info {
       grid-area: info;
+      justify-content: space-between;
     }
     .battery {
       grid-area: battery;
@@ -52,7 +53,8 @@ body {
     border-radius: 1rem;
     box-shadow: 5px 5px 5px 0px rgba(0, 0, 0, 0.25);
     flex-direction: column;
-    justify-content: space-around;
+    justify-content: start;
+    gap: 0.5rem;
   }
 }
 
