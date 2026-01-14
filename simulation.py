@@ -21,6 +21,7 @@ class TrainSimulation:
     charge_rate,
     discharge_rate,
     dt=1.0,
+    utilities_percentage=0.0,
     using_pantograph=True
     ):
         self.route_length = route_data['route_length']
@@ -48,6 +49,7 @@ class TrainSimulation:
         self.charge_rate = charge_rate
         self.discharge_rate = discharge_rate
         self.dt = dt
+        self.utilities_percentage = utilities_percentage
         self.using_pantograph = using_pantograph
         
         self.initilized = False
@@ -64,6 +66,7 @@ class TrainSimulation:
             self.total_energy = 0.0
             self.total_energy_regen = 0.0
             self.capacity = 0.0
+            self.utilities_power = 0.0
 
             self.electrified_driving = np.zeros_like(self.x, dtype=bool)
             self.battery_charge = np.zeros_like(self.x, dtype=float)
@@ -296,13 +299,13 @@ class TrainSimulation:
 
             if self.electrified_driving[i] and not stopped and self.using_pantograph: # Drawing power from overhead lines
                 current_capacity += max_charge * self.dt / 3600  # kWh
-                self.pantograph_power[i] = (max_charge * self.dt / 3600) + (Pi * self.dt / 3600)
+                self.pantograph_power[i] = (max_charge * self.dt / 3600) + (Pi * self.dt / 3600) + (self.utilities_power * self.dt / 3600)
             elif Pi >= 0 and not stopped: # Power consumption
-                current_capacity -= Pi * self.dt / 3600
+                current_capacity -= Pi * self.dt / 3600 + (self.utilities_power * self.dt / 3600)
             elif Pi < 0 and not stopped: # Regenerative braking
                 charge_power = min(-Pi, max_charge)
-                self.regenerated_power += charge_power * self.dt / 3600
-                current_capacity += charge_power * self.dt / 3600
+                self.regenerated_power += charge_power * self.dt / 3600 - (self.utilities_power * self.dt / 3600)
+                current_capacity += charge_power * self.dt / 3600 - (self.utilities_power * self.dt / 3600)
 
             # Clamp capacity
             current_capacity = max(0.0, min(current_capacity, capacity))
@@ -326,6 +329,10 @@ class TrainSimulation:
 
                         current_capacity += charge_power * self.dt / 3600
                         current_capacity = min(current_capacity, capacity)
+                    else:
+                        # No charging at this station
+                        current_capacity -= self.utilities_power * self.dt / 3600
+                        current_capacity = max(0.0, current_capacity)
 
                 # Detect departure
                 if stopped and self.v[i] > 0.1:
@@ -358,11 +365,13 @@ class TrainSimulation:
             starting_charge=self.capacity * 0.5,
             power=self.regen_power
         )
+
+        self.utilities_power = (self.total_energy_regen / (1 - self.utilities_percentage) / (self.t[-1] / 3600)) - (self.total_energy_regen / (self.t[-1] / 3600))
     
     def optimize_battery_capacity(self, target_final_charge=0.2, tol=0.01, max_iter=20, step_size=0.05, round_trips=10):
         self.run_simulation()
 
-        test_capacity = self.capacity * 1.5
+        test_capacity = self.capacity * 1.7
         prev_capacity = 0.0
 
         for iteration in range(max_iter):
