@@ -14,7 +14,7 @@ def main():
     regen_eff = 0.6     # Efficiency of regenerative breaking
     motor_eff = 0.85    # Efficiency of motor and drive train
     max_speed = 120 / 3.6   # m/s
-    utilities_power = 0.2   # percentage power used by utilities like air conditioning, lighting, etc.
+    utilities_power = 35    # Kw Power used by utilities like air conditioning, lighting, etc.
     safety_factor = 0.2     # Safety factor for how much power remains at the end of the day
     round_trips = 19    # Number of round trips to be made in a single day
     dt = 0.1             # Time step for simulation
@@ -54,7 +54,7 @@ def main():
         charge_rate=Li_ion_charge_rate,
         discharge_rate=Li_ion_discharge_rate,
         dt=dt,
-        utilities_percentage=utilities_power
+        utilities_power=utilities_power
     )
 
     #sim.run_simulation()
@@ -104,7 +104,7 @@ def main():
         discharge_rate=Li_ion_discharge_rate,
         dt=dt,
         using_pantograph=False,
-        utilities_percentage=utilities_power
+        utilities_power=utilities_power
     )
 
     battery_capacity_no_pantograph = sim2.optimize_battery_capacity(
@@ -122,7 +122,13 @@ def main():
     print(f"Weight saving by using pantograph: {weight_saving:.2f} kg")
 
     print(f"power used {sim.total_energy_regen / (sim.t[-1] / 3600):.2f} kW")
-    print(f"Power used by utilities: {sim.utilities_power:.2f} kW")
+    print(f"Power used by utilities: {utilities_power:.2f} kW")
+
+    battery_mass = battery_capacity / Li_ion_energy_density * 1000  # kg
+    print(f"Required battery mass: {battery_mass:.2f} kg")
+
+    energy_per_km = (sim.total_energy_regen / (sim.t[-1] / 3600)) / (x[-1] / 1000) + utilities_power / (x[-1] / 1000)  # kWh/km
+    print(f"Energy consumption: {energy_per_km:.2f} kWh/km")
 
 
     plt.figure()
