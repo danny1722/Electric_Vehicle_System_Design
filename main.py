@@ -124,7 +124,7 @@ def main():
     print(f"Battery size reduction by using pantograph: {battery_capacity_difference:.2f} kWh")
 
     weight_saving = (battery_capacity_difference / Li_ion_energy_density) * 1000  # kg
-    print(f"Weight saving by using pantograph: {weight_saving:.2f} kg")
+    print(f"Weight saving by using pantograph: {weight_saving - pantograph_weight * pantograph_count:.2f} kg")
 
     print(f"power used {sim.total_energy_regen / (sim.t[-1] / 3600):.2f} kW")
     print(f"Power used by utilities: {utilities_power:.2f} kW")
