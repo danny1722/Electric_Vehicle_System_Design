@@ -21,7 +21,7 @@ class TrainSimulation:
     charge_rate,
     discharge_rate,
     dt=1.0,
-    utilities_percentage=0.0,
+    utilities_power=0.0,
     using_pantograph=True
     ):
         self.route_length = route_data['route_length']
@@ -49,7 +49,7 @@ class TrainSimulation:
         self.charge_rate = charge_rate
         self.discharge_rate = discharge_rate
         self.dt = dt
-        self.utilities_percentage = utilities_percentage
+        self.utilities_power = utilities_power
         self.using_pantograph = using_pantograph
         
         self.initilized = False
@@ -366,7 +366,7 @@ class TrainSimulation:
             power=self.regen_power
         )
 
-        self.utilities_power = (self.total_energy_regen / (1 - self.utilities_percentage) / (self.t[-1] / 3600)) - (self.total_energy_regen / (self.t[-1] / 3600))
+        #self.utilities_power = (self.total_energy_regen / (1 - self.utilities_percentage) / (self.t[-1] / 3600)) - (self.total_energy_regen / (self.t[-1] / 3600))
     
     def optimize_battery_capacity(self, target_final_charge=0.2, tol=0.01, max_iter=20, step_size=0.05, round_trips=10, debug=True):
         self.run_simulation()
