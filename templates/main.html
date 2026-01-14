@@ -17,13 +17,11 @@
               <img src="{{ url_for('static', filename='powerProfile.png') }}" alt="2" />
               <img src="{{ url_for('static', filename='speedProfile.png') }}" alt="3" />
             </div>
-            <!-- TODO make these buttons not submit form -->
             <button class="btn prev" type="button">‹</button>
             <button class="btn next" type="button">›</button>
           </div>
         </div>
         <div class="info module">
-          <!-- <h1>Range: 25 km</h1> -->
           <h1>Weight: {{ mass }} kg</h1>
           <h1>Battery: {{ batteryCapacityStr }} kWh</h1>
           <h1>Max Speed: {{ max_speed }} km/h</h1>
