@@ -20,8 +20,8 @@ class TrainSimulation:
     regen_eff,
     charge_rate,
     discharge_rate,
+    utilities_power,
     dt=1.0,
-    utilities_power=0.0,
     using_pantograph=True
     ):
         self.route_length = route_data['route_length']
@@ -66,7 +66,6 @@ class TrainSimulation:
             self.total_energy = 0.0
             self.total_energy_regen = 0.0
             self.capacity = 0.0
-            self.utilities_power = 0.0
 
             self.electrified_driving = np.zeros_like(self.x, dtype=bool)
             self.battery_charge = np.zeros_like(self.x, dtype=float)

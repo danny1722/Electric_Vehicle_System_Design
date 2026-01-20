@@ -26,6 +26,7 @@ def main(debug=True):
         regen_eff=globals.regen_eff,
         charge_rate=globals.Li_ion_charge_rate,
         discharge_rate=globals.Li_ion_discharge_rate,
+        utilities_power=globals.utilities_power,
         dt=globals.dt,
         using_pantograph = globals.using_pantograph
     )
