@@ -10,6 +10,7 @@ max_speed = 120 / 3.6   # m/s
 safety_factor = 0.2     # Safety factor for how much power remains at the end of the day
 round_trips = 19    # Number of round trips to be made in a single day
 dt = 0.1             # Time step for simulation
+utilities_power = 35   # kW, power used for lighting, air conditioning, etc.
 using_pantograph = True
 
 # Acceleration and deceleration profile parameters

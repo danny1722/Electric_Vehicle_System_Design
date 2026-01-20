@@ -20,8 +20,8 @@ class TrainSimulation:
     regen_eff,
     charge_rate,
     discharge_rate,
+    utilities_power,
     dt=1.0,
-    utilities_power=0.0,
     using_pantograph=True
     ):
         self.route_length = route_data['route_length']
